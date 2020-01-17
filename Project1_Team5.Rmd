@@ -1,0 +1,329 @@
+---
+title: "STAR I - A Study on the Relationship between Class Type and Math Scores"
+author: "STA 207 Project I"
+date: "Jan 17, 2020"
+output: 
+  html_document: 
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+***
+
+Group ID: 5\
+Libin Feng：Introduction, Summary Statistics, R Markdown Formatting, Visualization Adjustment\
+Miao Hu: Model Description and Notation, R Markdown Formatting, Introduction\
+Huachao Lin: Model Diagnostics and Sensitivity Analysis\
+Roger Zhou: Discussion, Statistical Analysis, Conclusion, Wordings and Logics\
+Github repo link: https://github.com/miaohu2019/STA-207-Project-1.git
+
+***
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+library(AER)
+#install.packages('MASS')
+library(ggplot2)
+data('STAR')
+library(dplyr)
+library(table1)
+```
+# Introduction
+
+## Data Background
+
+In this project, we work on the public access data from Project STAR (Student/Teacher Achievement Ratio), a 4-year study on the effect of class size to the grade of students. 11,598 students in 79 schools were randomly assigned into one of three interventions: small classes, regular classes, and regular-with-aide classes, to which the teachers were also randomly assigned. The interventions were initiated as the students entered kindergarten and continued through 3rd grade. The data set consists of data on test scores, treatment groups, student characteristics and teacher characteristics.
+
+## Objective and Methodology
+
+Our objective is to study the effect of class size on math scores for the first graders and come up with a causal statement with our study. To achieve our goal, we decided to build a one-way ANOVA model with hypothesis tests to analyze the dataset. 
+
+## Summary of Findings
+
+Through the hypothesis tests we have found very significant effect of class size on students’ math scores. However, we have also noticed some issues with the data and the model assumptions that raise our concern on the validity of the causal statement.
+
+# Statistical Analysis
+
+## Summary Statistics
+
+Upon studying 14 variables of the first-graders, we found that among the total 11598 observations, 6600 of them have both class size/type and scaled math scores on record, and hence are regarded as complete cases in this analysis. For the purpose of our study, any case with missing values in either class size type or scaled math score are removed before the construction of our statistical model. Only complete cases are considered in the subsequent analysis in that the remaining sample size is still sufficiently large.    
+
+The frequency table of listed categorical variables and number summaries of continuous variables related to the first grade (without system ID, school ID and time of birth) are shown in the summary Table 1. Although sample size is not balanced among three class-sizes , the proportions of factor levels within other categorical variables are roughly similar across three class sizes, with the exception of assignment of teachers in the first grade.  
+
+
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+STAR1 <- STAR
+
+STAR1$ethnicity <- 
+  factor(STAR1$ethnicity,
+         labels=c("Caucasian", "African American","Asian",
+                  "Hispanic","American Indian","Other"))
+
+STAR1$ladder1 <- factor(STAR1$ladder1,
+                        labels = c("Level 1", "Level 2", 
+                                   "Level 3", "Apprentice", 
+                                   "Probation", "Not Ladder"))
+
+STAR1$tethnicity1 <-   factor(STAR1$tethnicity1,
+                              labels=c("Caucasian", "African American"))
+
+label(STAR1$gender) <- "Student's gender"
+label(STAR1$ethnicity) <- "Student's ethnicity"
+label(STAR1$math1) <- 'Scaled math score in 1st grade'
+label(STAR1$read1) <- 'Scaled reading score in 1st grade'
+label(STAR1$lunch1) <- 'Was the student qualified for free lunch?'
+label(STAR1$school1) <- 'School type in 1st grade '
+label(STAR1$degree1)<- "Highest degree of 1st grade teacher"
+label(STAR1$ladder1) <- "Teacher's career ladder level in 1st grade"
+label(STAR1$experience1) <- "Years of teacher's total teaching experience in 1st grade"
+label(STAR1$tethnicity1) <- "Teacher's ethnicity in 1st grade"
+
+STAR2 <- STAR1[,c('star1','math1')]
+STAR2 <- STAR2[complete.cases(STAR2),]
+
+```
+
+
+```{r include=FALSE,warning=FALSE,message=FALSE, include=FALSE}
+mean1 <- aggregate(STAR2$math1,by = as.data.frame(STAR2$star1),FUN=mean)
+mean1
+mean(STAR2$math1,na.rm=TRUE)
+```
+
+
+The average scaled math scores among students are `r mean1[2,2]` for small classes, `r mean1[1,2]` for regular with aide classes, and `r mean1[3,2]` for regular classes. The mean scaled math scores for all grade one students are `r mean(STAR2$math1,na.rm=TRUE)`, quite similar to the mean of regular with aide classes. Despite the difference in the means, the sample variances are very close between the three groups. With the aid of histogram, we see that the math scores are approximately normally distributed in all three levels of the class type.  
+
+
+
+```{r warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+ library(ggplot2)
+ ggplot(data=STAR2, aes(x=math1),)+
+   geom_histogram(color="black", fill="white")+
+   facet_grid(star1 ~ .) +
+   geom_vline(data=data.frame(mean=mean1$x,star1=mean1$`STAR2$star1`), aes(xintercept=mean,color=star1),
+              linetype="dashed")+
+   ggtitle(label='scaled math scores of grade 1 by different treatment')
+
+```
+
+
+
+## Model and Assumptions
+
+
+We employ the conventional cell-means model as specified below:  
+
+$Y_{ij} = \mu_i + \epsilon_{ij}; \forall i=1,2,3, j\in\{1,\cdots,n_i\}$, with the assumption $\epsilon_{ij} \stackrel{iid}{\sim} N(0,\sigma^2)$.
+
+where $Y_{ij}$ is the math score of the j-th student in the i-th group (i.e. class type); $\mu_i$ is the true mean of the math scores of the i-th group; $\epsilon_{ij}$ is the noise in the math score for the j-th student in the i-th treatment level, i.e. class type. There are a total of 3 class types, each containing $n_i$ students.  
+  
+
+We believe this model is appropriate as it allows comparisons of the data among three treatment groups. Additionally, the students were randomly assigned to different class types with the teacher also assigned randomly. This design of the experiment indicate the constant variance and normality assumption of the one-way ANOVA model might be satisfied. Further investigation, however, needs to be conducted.   
+
+
+
+```{r, echo=FALSE}
+removed = STAR2
+anova.fit<- aov(math1~star1,data = removed)
+#summary(anova.fit)
+fit2 = lm(math1~star1, data = removed)
+```
+
+## Tests Performed  
+
+### Model Diagnostics  
+
+#### Examining normality of the error terms $\epsilon_{ij}$  
+
+Shapiro-Wilks test is used to rigorously examine the normality of the error terms, accompanied by a histogram and a Normal Q-Q plot for visualization purposes.  
+
+#### Omitted Variables  
+
+In principle, we can omit other independent variables if we believe that we randomization is clean. In other words, the control and treatment groups are homogeneous prior to the treatment. While randomization is taken as given in this study, chances are that the randomization could break down due to unexpected reasons (e.g. breach of full compliance) and error could be introduced since we have omitted variables that are actually relevant to the outcome. Residuals against gender, ethnicity, and birth time are then plotted, respectively, in order to show whether the math score is associated with these variables in some way.  
+
+#### Testing the Equal VAriance Assumption  
+
+To check if the equal variance assumption, i.e. homoscedasticity, holds, the Brown-Forsythe test is chosen out of a list of candidates including both parametric tests and non-parametric tests. Reasons that lead to this choice are as follows. Primarily, the distribution of residuals appear to be slightly right-skewed, potentially violating the normality assumption. The B-F test provides a robust procedure even in the absence of normality assumption, hence preserving the statistical power. In comparison, other tests for homoscedasticity including Hartley’s test and Barlett’s test are quite sensitive to the departure from normality. Moreover, the B-F test is based on the median, a robust statistic, as opposed to the Levene’s test, which is based on the sample mean.    
+
+### ANOVA F-test  
+
+The most important test conducted in this report is the ANOVA F-test, whose null hypothesis is the equality of group means: the first-grade students from classes of 3 different sizes have the same average scaled math scores, against the alternative hypothesis that the average scaled math scores of first-grade students of at least one class-size treatment is different from others. The null hypothesis can be expressed as follows: $H_0:\mu_1=\mu_2=\mu_3$. Based on the test result, we will further investigate if we can interpret the effect as causal effect in the Discussion section. Note that for the sake of convenience, this test along with the test described below will be based on the linear regression form of the aforementioned cell-means ANOVA model.  
+
+### Testing Contrasts Using Scheffe's Method  
+
+Lastly, we will explore the statistical significance of some linear combination of the average scaled math scores across different groups of students, also known as the contrast. As a canonical example, we can examine if the average of the two extreme mean scaled math scores is significantly different from the mean of the middle group, using Scheffé's method. The hypotheses can be formulated as $H_0:L=0\, vs. \, H_A:L\neq0$, where $L=\mu_{(2)}-\frac{1}{2}\cdot(\mu_{(1)}+\mu_{(3)})$, and $\mu_{(i)}$ denotes the i-th group mean after sorting all group means. In general, any valid contrast can be tested following the same procedures.  
+
+# Results
+
+## Model Estimates  
+
+The model estimates are reported in Table 2. The histogram of residuals is shown is Figure 2. It is bell-shaped with a peak near 0. The p-value of Shapiro-Wilks test is 1.495e-13. P-value is smaller than our preset 0.05 significance level, implying that the residual is not likely to be normally distributed. So, we reject the null hypothesis of normal distribution at any conventional significance level. This leads to a violation of the normality assumption of the one-way ANOVA model. The Normal Q-Q plot in Figure 3, on the other hand, shows right-skewness in the distribution of the residuals, which confirms the non-normality among the error terms.  
+
+n this model, only one factor is considered, which might cause under-identification due to the omitted variables. The residuals plotted against other variables are shown in Figure 4, 5, & 6. No difference in the boxplots is evident between male and female. A weak pattern may or may not exist when plotting the residuals against birth dates. However, some pattern is clearly present across different ethnicity groups. It is likely that omitted variable, ethnicity, should enter the model as a secondary factor.
+
+
+```{r, echo=FALSE, include=FALSE}
+residuals = anova.fit$residuals
+shapiro.test(residuals[0:5000])
+hist(residuals)
+qqnorm(residuals);qqline(residuals)
+
+
+# Plot residuals against missing variables 
+Data = STAR1[complete.cases(STAR1[,c('star1','math1')]),]
+plot(residuals~Data$gender,type='p',pch=16,cex=1.5,xlab="gender",ylab="Residuals")
+plot(residuals~Data$ethnicity,type='p',pch=16,cex=1.5,xlab="ethnicity",ylab="Residuals")
+True_index = complete.cases(Data[,'birth'])
+plot(residuals[True_index]~Data[True_index,'birth'],type='p',pch=16,cex=1.5,xlab="birth",ylab="Residuals")
+
+```
+```{r, echo=FALSE, include=FALSE }
+# Brown-Forsythe Test for Homoscedasticity
+groups <- split(STAR2$math1,STAR2$star1)
+p <- length(groups)
+N <- length(unlist(groups))
+  
+bf_test <- function(list1, N, p){
+  numer <- numeric(1)
+  denom <- numeric(1)
+  new_data <- vector("list", 3)
+  
+  for(j in 1:p){
+    new_data[[j]] <- abs(list1[[j]]-median(list1[[j]]))
+  }
+  
+  overall <- mean(unlist(new_data))
+  
+  for(i in new_data){
+    numer <- numer + length(i)*(mean(i)-overall)^2
+    denom <- denom + sum((i-mean(i))^2)
+  }
+  return((N-p)*numer/(p-1)/denom)
+}
+
+(bf_statistic <- bf_test(groups, N, p))
+bf_statistic > qf(0.95, p-1, N-p) # Fail to reject equal variance assumption
+```
+
+
+
+## Hypothesis Test Results  
+
+a. Based on the formula provided by “Engineering Statistics Handbook”, we compute the F-statistic for the B-F test to be 2.909818, which is less than the critical value F(0.95,2,6597)=2.997093. This indicates that we would fail to reject the hypothesis that the variances are equal across different class sizes at 5% level. In other words, we do not have evidence that the variances are different across groups.   
+
+b. As is shown in Table 2, the ANOVA table, the ANOVA F-statistic is 53, much larger than the critical value at 5% level (same as above); likewise, the corresponding p-value also implies that we would reject the null hypothesis that the means are the same across different groups. Therefore, we conclude that at least one class size showed significantly different average math scores than the other two class sizes. Equivalent, we can also interpret this as that different class sizes resulted in different average math scores.   
+
+c. Following the procedures of the Scheffe’s method, we calculate the 95% Scheffe’s confidence interval to be $(-5.0872692,0.3854445)$. Since it does not contain 0, we conclude that the aforementioned contrast of interest is not significant at 5% level. In the context of this study, we interpret the result as follows: we are 95% confident that the mean of the highest average math score ($\mu_3$) and the lowest average math score $\mu_1$ is not significantly different the middle average math score $\mu_2$. 
+
+
+
+```{r, echo=FALSE }
+# ANOVA F-test
+table2 = anova(fit2)
+rownames(table2)[1] <- "Treatment"
+# ANOVA table
+table2 = anova(fit2)
+table2 <- rbind(table2,c(table2[1,1]+table2[2,1],table2[1,2]+table2[2,2],NA,NA,NA))
+colnames(table2) <- c('Degree of freedom','Sum of Squares','Mean of Squares','F-test Statistic','P-value')
+rownames(table2) <- c('Treatment','Residuals','Total')
+#knitr::kable(table2, digits=3,caption='Analysis of Variance Table',align='c', full_width = F)
+#qf(0.95, 2, 6597)
+```
+
+
+
+
+```{r, echo=FALSE, include=FALSE}
+# Scheffe's Test for Contrast
+Y <- c(fit2$coefficients[1], fit2$coefficients[1]+fit2$coefficients[-1])
+C_hat <- Y %*% c(-1/2, -1/2, 1) # Estimate of the contrast of interest
+var_C <- summary(fit2)$sigma^2*sum(c(-1/2, -1/2, 1)^2/unlist(lapply(groups,length)))
+c(C_hat-sqrt(var_C*(p-1)*qf(0.95, p-1, N-p)), C_hat+sqrt(var_C*(p-1)*qf(0.95, p-1, N-p))) # Fail to reject H0 here
+```
+
+
+# Discussion
+
+1. Although the residuals do not appear to depart from a normal distribution in the histogram, the Shapiro-Wilks test and the Normal-QQ plot both suggest otherwise. Furthermore, when the residuals are plotted against other omitted variables, there seems to be some pattern associated with ethnicity. In the limited time horizon, we cannot determine if and through what pathway ethnicity contributes to the non-normality among the residuals. We may stress more on this variable in the next project.  
+
+2. Generally, sensitivity analysis can be employed to study the uncertainty in the outcome with respect to a small change in some intrinsic characteristics of a model. It helps to evaluate the robustness of the results from a particular mathematical model. In this case, we suspect that alternative model specifications could affect the results of the above analysis. Regretfully, we have not been able to discover an appropriate way to examine the sensitivity of our one-way ANOVA model. Provided some additional time, we believe that we will find a suitable method to perform the sensitivity analysis.  
+
+3. Similar to the Scheffe’s procedure demonstrated in this report, one can test the statistical significance of any contrast of interest so long as the weights add up to 0, i.e. the contrast is well-defined. The Scheffe’s method allows us to examine a number of contrasts.  
+
+4. Ideally, we would like to conclude causal impact from the current study. However, we are aware of two things that could potentially undermine the legitimacy of our causal statement. First, students initially assigned the three class types in kindergarten were reassigned into regular and regular with aide classes for first grade, as was mentioned in the original STAR Technical Report. This could distort the randomization of the experiment, thus contaminating the independence between the treatment and the potential outcomes. Additionally, the significance of the ANOVA F-test relies heavily on the normality and homoscedasticity assumptions. Until we have resolved or located the source of the ostensible non-normality in the residuals, we should remain skeptical of the conclusions that we have made.  
+
+As a side note, unlike tasks involving model selection, splitting the data and cross-validating the candidate model are omitted in this project, since only one model is considered throughout our analysis.  
+
+# Conclusion
+
+In this study, we have employed a one-way ANOVA model to explain the data from an experiment, with the hope of drawing causal inference. In principle, if one believes that the randomization is clean, and all model assumptions hold, then causality would follow in the rejection of the null hypothesis of the ANOVA F-test. While we have rejected the null hypothesis based on the data and our analysis, we should not overlook the fact that some non-normality appears to be present at both tails of the residuals, let alone the inherent issues with the data when the experiment was being implemented.  
+
+In future studies, we should take into consideration a broader set of variables to holistically inspect the potential treatment effect of class types on students’ learning outcomes. Under the circumstances where some critical assumptions fail, we need to research and carry out remedial approaches to ensure the validity of the desired conclusions. 
+
+
+# Appendix
+## Tables and Graphs
+$$\textit{Table 1 Summary Statistics: Frequency Table / Numerical Summaries of Selected Variables}$$
+```{r message=FALSE,warning=FALSE,echo=FALSE}
+table1(~ gender+ethnicity+math1+read1+lunch1+school1+degree1+ladder1+experience1+tethnicity1 | star1, data=STAR1, caption = 'Table 1 Summary Statistics / Frequency Table of Variables')
+```
+
+\n
+
+$$\textit{Figure 1 Scaled Math Scores of First Grade Students by Different Class Size}$$
+
+```{r warning=FALSE, message=FALSE, echo=FALSE, fig.width=7, fig.height=5, fig.align= 'center' }
+ggplot(data=STAR2, aes(x=math1),)+
+  geom_histogram(color="black", fill="white")+
+  facet_grid(star1 ~ .) +
+  geom_vline(data=data.frame(mean=mean1$x,star1=mean1$`STAR2$star1`), aes(xintercept=mean,color=star1),
+             linetype="dashed")
+
+```
+\n
+$$\textit{Table 2 ANOVA Table}$$
+
+```{r, echo=FALSE, fig.height = 5, fig.width=8}
+knitr::kable(table2, digits=3,align='c', full_width = F)
+```
+
+\n
+$$\textit{Figure 2 Histogram of residuals;       Figure 3 Normal Q-Q Plot}$$
+
+```{r, echo=FALSE, fig.align='center', fig.width= 8, fig.height=5}
+par(mfrow=c(1,2))
+hist(residuals, main = "Histogram of residuals")
+qqnorm(residuals, main = 'Normal Q-Q Plot');qqline(residuals)
+```
+\n
+$$\textit{Figure 4-6 Residuals vs. Gender, Ethnicity and Birth Time}$$
+
+```{r, echo=FALSE, fig.width=7, fig.height=7, fig.align='center'}
+par(mfrow = c(2,2))
+# Plot residuals against missing variables 
+Data = STAR1[complete.cases(STAR1[,c('star1','math1')]),]
+plot(residuals~Data$gender,type='p',pch=16,cex=.6,xlab="gender",ylab="Residuals", main = 'Figure 4 Residuals vs. Gender')
+#plot(residuals~Data$ethnicity,type='p',pch=16,cex=1.5,xlab="ethnicity",ylab="Residuals")
+#True_index = complete.cases(Data[,'birth'])
+#plot(residuals[True_index]~Data[True_index,'birth'],type='p',pch=16,cex=1.5,xlab="birth",ylab="Residuals")
+plot(residuals~Data$ethnicity,type='p',pch=16,cex=0.6,xlab="ethnicity",ylab="Residuals", main = 'Figure 5 Residuals vs. ethnicity')
+True_index = complete.cases(Data[,'birth'])
+plot(residuals[True_index]~Data[True_index,'birth'],type='p',pch=16,cex=0.6,xlab="birth",ylab="Residuals", main = 'Figure 6 Residuals vs Birth')
+```
+
+
+## References
+Derrick, B; Ruck, A; Toher, D; White, P (2018). "Tests for equality of variances     between two samples which contain both paired observations and independent observations". Journal of Applied Quantitative Methods. 13 (2): 36–47.
+
+Hartley, H.O. (1950). The maximum F-ratio as a short cut test for homogeneity of variance, Biometrika, 37, 308-312.
+
+Mendes, M., & Pala, A. (2003). Type I error rate and power of three normality tests. Pakistan Journal of Information and Technology, 2(2), 135-139.
+
+Word, ER, Johnston, J, Bain, HP, Fulton, BD, Boyd-Zaharias, J, Achilles, CM, Lintz, MN, Folger, J, Breda, C (1990). “The State of Tennessee's Student/Teacher Achievement Ratio (STAR) Project”.
+
+Tennessee State Department of Education Technical Report 1985–1990. (https://www.classsizematters.org/wp-content/uploads/2016/09/STAR-Technical-Report-Part-I.pdf)
+
+## Session Information
+```{r}
+print(sessionInfo(), local = FALSE)
+```
